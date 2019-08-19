@@ -291,7 +291,7 @@ def compute_style_cost(model, STYLE_LAYERS, sess):
         a_G = out
         
         # Compute style_cost for the current layer
-        J_style_layer = util.compute_layer_style_cost(a_S, a_G)
+        J_style_layer = compute_layer_style_cost(a_S, a_G)
 
         # Add coeff * J_style_layer of this layer to overall style cost
         J_style += coeff * J_style_layer

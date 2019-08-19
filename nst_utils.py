@@ -1,12 +1,12 @@
 import scipy.io
 import scipy.misc
-import matplotlib.pyplot as plt
 import numpy as np
 import tensorflow as tf
+import numpy as np
 
 class CONFIG:
-    IMAGE_WIDTH = 400
-    IMAGE_HEIGHT = 300
+    IMAGE_WIDTH = 300
+    IMAGE_HEIGHT = 225
     COLOR_CHANNELS = 3
     NOISE_RATIO = 0.99
     MEANS = np.array([123.68, 116.779, 103.939]).reshape((1,1,1,3)) 
@@ -90,6 +90,7 @@ def load_vgg_model(path):
         Return the RELU function wrapped over a TensorFlow layer. Expects a
         Conv2d layer input.
         """
+        
         return tf.nn.relu(conv2d_layer)
 
     def _conv2d(prev_layer, layer, layer_name):
@@ -177,7 +178,7 @@ def save_image(path, image):
     
     # Clip and Save the image
     image = np.clip(image[0], 0, 255).astype('uint8')
-    plt.imsave(path, image)
+    scipy.misc.imsave(path, image)
     
 def compute_content_cost(a_C, a_G):
     """
@@ -194,11 +195,11 @@ def compute_content_cost(a_C, a_G):
     # Retrieve dimensions from a_G (≈1 line)
     m, n_H, n_W, n_C = a_G.get_shape().as_list()
     
-    # Reshape a_C and a_G (≈2 lines)
-    a_C_unrolled = tf.reshape(a_C, [n_C, n_H * n_W], name='a_C_unrolled')
-    a_G_unrolled = tf.reshape(a_G, [n_C, n_H * n_W], name='a_G_unrolled')
+    # Reshape a_C and a_G
+    a_C_unrolled = tf.reshape(a_C, [n_H*n_W, n_C])
+    a_G_unrolled = tf.reshape(a_G, [n_H*n_W, n_C])
     
-    # compute the cost with tensorflow (≈1 line)
+    # compute the cost with tensorflow
     J_content = 1 / (4 * n_H * n_W * n_C) * tf.reduce_sum( tf.square( tf.subtract(a_C_unrolled, a_G_unrolled) ) )
     
     return J_content
@@ -229,15 +230,15 @@ def compute_layer_style_cost(a_S, a_G):
     m, n_H, n_W, n_C = a_G.get_shape().as_list()
     
     # Reshape the images to have them of shape (n_C, n_H*n_W) (≈2 lines)
-    a_S = tf.transpose(tf.reshape(a_S, [n_H * n_W, n_C]))
-    a_G = tf.transpose(tf.reshape(a_G, [n_H * n_W, n_C]))
+    a_S = tf.transpose(tf.reshape(a_S, [n_H*n_W, n_C]))
+    a_G = tf.transpose(tf.reshape(a_G, [n_H*n_W, n_C]))
 
     # Computing gram_matrices for both images S and G (≈2 lines)
     GS = gram_matrix(a_S)
     GG = gram_matrix(a_G)
 
     # Computing the loss (≈1 line)
-    J_style_layer = 1 / (4 * np.square(n_C) * np.square(n_W * n_H) ) * tf.reduce_sum( tf.square( tf.subtract(GS, GG) ) )
+    J_style_layer = tf.reduce_sum(tf.square(tf.subtract(GS,GG))) / (4* tf.square(tf.to_float(n_H*n_W*n_C)))
     
     return J_style_layer
 
@@ -290,7 +291,7 @@ def compute_style_cost(model, STYLE_LAYERS, sess):
         a_G = out
         
         # Compute style_cost for the current layer
-        J_style_layer = compute_layer_style_cost(a_S, a_G)
+        J_style_layer = util.compute_layer_style_cost(a_S, a_G)
 
         # Add coeff * J_style_layer of this layer to overall style cost
         J_style += coeff * J_style_layer

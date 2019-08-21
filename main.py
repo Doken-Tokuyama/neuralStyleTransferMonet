@@ -11,11 +11,10 @@ from matplotlib.pyplot import imshow
 import nst_utils as util
 import tensorflow as tf
 import scipy
+import numpy as np
 
 os.environ['KMP_DUPLICATE_LIB_OK']='True'
-
-tf.reset_default_graph()
-model = util.load_vgg_model("imagenet-vgg-verydeep-19.mat")
+model = util.load_vgg_model(util.CONFIG.VGG_MODEL)
 
 STYLE_LAYERS = [
     ('conv1_1', 0.2),
@@ -24,19 +23,30 @@ STYLE_LAYERS = [
     ('conv4_1', 0.2),
     ('conv5_1', 0.2)]
 
-content_image = scipy.misc.imread("louvre.jpg")
-content_image = scipy.misc.imresize(content_image, size=(225,300,3))
-content_image = util.reshape_and_normalize_image(content_image)
+#STYLE_LAYERS = [
+#    ('conv1_1', 0.01),
+#    ('conv2_1', 0.01),
+#    ('conv3_1', 0.01)]
 
-style_image = scipy.misc.imread("monet.jpg")
-style_image = scipy.misc.imresize(style_image, size=(225,300,3))
+content_image = scipy.misc.imread(util.CONFIG.CONTENT_IMAGE)
+content_image = scipy.misc.imresize(content_image, size=(util.CONFIG.IMAGE_HEIGHT,
+                                                         util.CONFIG.IMAGE_WIDTH,
+                                                         util.CONFIG.COLOR_CHANNELS))
+content_image = util.reshape_and_normalize_image(content_image)
+content_image = np.float32(content_image)
+
+style_image = scipy.misc.imread(util.CONFIG.STYLE_IMAGE)
+style_image = scipy.misc.imresize(style_image, size=(util.CONFIG.IMAGE_HEIGHT,
+                                                     util.CONFIG.IMAGE_WIDTH,
+                                                     util.CONFIG.COLOR_CHANNELS))
 style_image = util.reshape_and_normalize_image(style_image)
+style_image = np.float32(style_image)
 
 generated_image = util.generate_noise_image(content_image)
 imshow(generated_image[0])
 imshow(content_image[0])
 imshow(style_image[0])
-    
+
 # Assign the content image to be the input of the VGG model.  
 # Start interactive session
 sess = tf.InteractiveSession()
@@ -52,6 +62,8 @@ a_C = sess.run(out)
 # and isn't evaluated yet. Later in the code, we'll assign the image G as the model input, so that
 # when we run the session, this will be the activations drawn from the appropriate layer, with G as input.
 a_G = out
+print('START: np.sum(a_G.eval()): ')
+print(np.sum(a_G.eval()))
 
 # Compute the content cost
 J_content = util.compute_content_cost(a_C, a_G)
@@ -69,7 +81,7 @@ optimizer = tf.train.AdamOptimizer(2.0)
 # define train_step
 train_step = optimizer.minimize(J)
 
-def model_nn(sess, input_image, num_iterations = 30):
+def model_nn(sess, input_image, num_iterations = 2):
     
     # Initialize global variables (you need to run the session on the initializer)
     sess.run(tf.global_variables_initializer())
@@ -84,9 +96,11 @@ def model_nn(sess, input_image, num_iterations = 30):
         
         # Compute the generated image by running the session on the current model['input']
         generated_image = sess.run(model['input'])
+        print("generated_image:")
+        print(generated_image) #model['input'].eval(), all weights became nan after 1 iteration
 
-        # Print every 20 iteration.
         if i%1 == 0:
+            
             Jc = sess.run(J_content)
             Js = sess.run(J_style)
             Jt = sess.run(J)
@@ -96,10 +110,10 @@ def model_nn(sess, input_image, num_iterations = 30):
             print("style cost = " + str(Js))
             
             # save current generated image in the "/output" directory
-            util.save_image("out/" + str(i) + ".png", generated_image)
+            #util.save_image(util.CONFIG.OUTPUT_DIR + str(i) + ".png", generated_image)
     
     # save last generated image
-    util.save_image('out/generated_image.jpg', generated_image)
+    #util.save_image('out/generated_image.jpg', generated_image)
     
     return generated_image
 

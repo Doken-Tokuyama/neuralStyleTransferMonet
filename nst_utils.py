@@ -2,18 +2,17 @@ import scipy.io
 import scipy.misc
 import numpy as np
 import tensorflow as tf
-import numpy as np
 
 class CONFIG:
-    IMAGE_WIDTH = 300
-    IMAGE_HEIGHT = 225
+    IMAGE_WIDTH = 400
+    IMAGE_HEIGHT = 300
     COLOR_CHANNELS = 3
     NOISE_RATIO = 0.99
     MEANS = np.array([123.68, 116.779, 103.939]).reshape((1,1,1,3)) 
-    VGG_MODEL = 'imagenet-vgg-verydeep-19.mat' # Pick the VGG 19-layer model by from the paper "Very Deep Convolutional Networks for Large-Scale Image Recognition".
-    STYLE_IMAGE = 'images/stone_style.jpg' # Style image to use.
-    CONTENT_IMAGE = 'images/content300.jpg' # Content image to use.
-    OUTPUT_DIR = 'output/'
+    VGG_MODEL = 'imagenet-vgg-verydeep-19.mat' # VGG 19-layer model by from the paper "Very Deep Convolutional Networks for Large-Scale Image Recognition".
+    STYLE_IMAGE = "monet.jpg" 
+    CONTENT_IMAGE = "louvre.jpg"
+    OUTPUT_DIR = 'out/'
     
 def load_vgg_model(path):
     """
@@ -196,11 +195,11 @@ def compute_content_cost(a_C, a_G):
     m, n_H, n_W, n_C = a_G.get_shape().as_list()
     
     # Reshape a_C and a_G
-    a_C_unrolled = tf.reshape(a_C, [n_H*n_W, n_C])
-    a_G_unrolled = tf.reshape(a_G, [n_H*n_W, n_C])
+    a_C_unrolled = tf.reshape(a_C, [m, n_H*n_W, n_C])
+    a_G_unrolled = tf.reshape(a_G, [m, n_H*n_W, n_C])
     
     # compute the cost with tensorflow
-    J_content = 1 / (4 * n_H * n_W * n_C) * tf.reduce_sum( tf.square( tf.subtract(a_C_unrolled, a_G_unrolled) ) )
+    J_content = tf.reduce_sum( tf.square( tf.subtract(a_C_unrolled, a_G_unrolled) ) ) / (4 * n_H * n_W * n_C)
     
     return J_content
 
@@ -226,23 +225,23 @@ def compute_layer_style_cost(a_S, a_G):
     J_style_layer -- tensor representing a scalar value, style cost defined above by equation (2)
     """
     
-    # Retrieve dimensions from a_G (≈1 line)
+    # Retrieve dimensions from a_G
     m, n_H, n_W, n_C = a_G.get_shape().as_list()
     
-    # Reshape the images to have them of shape (n_C, n_H*n_W) (≈2 lines)
+    # Reshape the images to have them of shape (n_C, n_H*n_W)
     a_S = tf.transpose(tf.reshape(a_S, [n_H*n_W, n_C]))
     a_G = tf.transpose(tf.reshape(a_G, [n_H*n_W, n_C]))
 
-    # Computing gram_matrices for both images S and G (≈2 lines)
+    # Computing gram_matrices for both images S and G
     GS = gram_matrix(a_S)
     GG = gram_matrix(a_G)
 
-    # Computing the loss (≈1 line)
-    J_style_layer = tf.reduce_sum(tf.square(tf.subtract(GS,GG))) / (4* tf.square(tf.to_float(n_H*n_W*n_C)))
+    # Computing the loss
+    J_style_layer = tf.reduce_sum(tf.square(tf.subtract(GS, GG))) / (4*(n_H*n_W*n_C)**2)
     
     return J_style_layer
 
-def total_cost(J_content, J_style, alpha = 10, beta = 40):
+def total_cost(J_content, J_style, alpha, beta):
     """
     Computes the total cost function
     
